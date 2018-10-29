@@ -1,0 +1,52 @@
+---
+title: "Bladder.Affymetrix.2018"
+author: "Robert W. Murdoch"
+date: "October 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a full pipeline for importaing affymetrix .CEL data (human microarray chip data)
+and running full pairwise differential abundance tests.  A full annotation table is also
+referenced in order to link probe names to gene names.  
+
+The .CEL data is read and analyzed by the "limma" package
+
+## initializing limma and dependent packages and importing the annotation table
+
+First, the necessary libraries are activated and the annotation table 
+(downloaded from an Affymetrix website) is read in:
+
+```{r, echo=FALSE}
+library(limma)
+library(statmod)
+library(affy)
+library(affycoretools)
+library(oligo)
+library(hta20transcriptcluster.db)
+```
+```{r}
+Annotation <- read.csv("HTA-2_0.na35.2.hg19.transcript.csv/HTA-2_0.na35.2.hg19.transcript.csv", header=TRUE, skip=19)
+```
+
+The annotation table is very large and many columns are merged redundant database references (using "//" as separator):
+```{r}
+head(Annotation)
+```
+
+## Test matrices
+
+Differential abundance can only be performed on pairs of sample sets.  
+
+```{r pressure}
+targets <- read.csv("targets.txt", as.is=T)
+targets.tGF.cGF <- read.csv("targets.GFonly.txt", as.is=T)
+targets.tGFR.cGFR <- read.csv("targets.GFRonly.txt", as.is=T)
+targets.cGFR.cGF <- read.csv("targets.noDrug.Strain.txt", as.is=T)
+targets.tGFR.tGF <- read.csv("targets.drugonly.txt", as.is=T)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
