@@ -20,7 +20,7 @@ The .CEL data is read and analyzed by the "limma" package
 First, the necessary libraries are activated and the annotation table 
 (downloaded from an Affymetrix website) is read in:
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, results="hide"}
 library(limma)
 library(statmod)
 library(affy)
@@ -32,10 +32,35 @@ library(hta20transcriptcluster.db)
 Annotation <- read.csv("HTA-2_0.na35.2.hg19.transcript.csv/HTA-2_0.na35.2.hg19.transcript.csv", header=TRUE, skip=19)
 ```
 
-The annotation table is very large and many columns are merged redundant database references (using "//" as separator).
-However, it is very powerful as it links the probes to a huge number of databases:
+The annotation table is very large and many columns are merged redundant database references (using "//" as separator). it is far too wide to display here!
+However, it is very powerful as it links the probes to a huge number of databases.
+
+##Mapping probe ID to genes and pathways
+The Annotation table has several columns:
 ```{r}
-head(Annotation)
+colnames(Annotation)
+```
+
+Many of these are potentially very useful.  For now, I am useing the gene_assignment column.  This contains many names separated by //.  A single entry can look like this:
+
+```{r}
+Annotation[1,"gene_assignment"]
+```
+
+The second one is a gene name that links well to many databases and the third provides a description. 
+The gene names can be fed into the Reactome online database for pathway mapping.
+We will create a focused mapping table that only has the necessary fields. This object
+will be used to attach gene names and functions to the final diff.expression tables
+```{r}
+genenames.all <- Annotation
+gene.split <- data.frame(do.call('rbind',strsplit(as.character(genenames.all$gene_assignment),"//",fixed=T)))
+probe.gene.map <- data.frame(gene.split[,c(2,3)])
+probe.gene.map$probe <- Annotation[,1]
+probe.gene.map <- probe.gene.map[,c(3,1,2)]
+probe.gene.map$X2 <- gsub("[[:space:]]", "", probe.gene.map$X2)
+colnames(probe.gene.map) <- c("probe","name","description")
+
+head(probe.gene.map)
 ```
 
 ## Test matrices
@@ -57,17 +82,16 @@ all of the samples and metadata are listed here:
 targets
 ```
 
-The matrices are set up as such; this matrix is for comparing non-treated and treated samples within in strain GF (control strain)
+The matrices are set up as such; this matrix is for comparing non-treated and treated samples within in strain GF (control strain). Note thta this is just one of the tests; we now have matrices for 3 other test schemes.
 
 ```{r}
 targets.tGF.cGF
 ```
 
 ## Reading the .CEL files and normalizing.
-*after being read in, the project is a complex object, not directly viewable.
-*the "exprs" function from the Biobase package pulls out the expression data as a table; at the same time, control 
-  probes are removed.
-*this code chunk also writes the full normalized results as a .tsv file (although there are no stats or comparisons)
+* after being read in, the project is a complex object, not directly viewable.
+* the "exprs" function from the Biobase package pulls out the expression data as a table; at the same time, control probes are removed.
+* this code chunk also writes the full normalized results as a .tsv file (although there are no stats or comparisons)
 
 ```{r}
 dat <- read.celfiles(targets$FileName) #read .CEL files
@@ -80,40 +104,15 @@ write.table(project.bgcorrect.norm.avg.filt, "full.expression.results.tsv", sep=
 
 ## The expression table
 
-After export and filtration, the simplified table looks like:
+After export and filtration, the simplified table looks like 
+(this is the first 6 probes and their normalized intensities):
 ```{r}
 head(data.frame(project.bgcorrect.norm.avg.filt))
 ```
 
-##Mapping probe ID to genes and pathways
-The Annotation table has several columns:
-```{r}
-colnames(Annotation)
-```
 
-Many of these are potentially very useful.  For now, I am useing the gene_assignment column.  This contains many names separated by //.  A single entry can look like this:
 
-```{r}
-Annotation[1,"gene_assignment"]
-```
-
-The second one is a gene name that links well to many databases and the third provides a description. 
-The gene names can be fed into the Reactome online database for pathway mapping.
-We will create a focused mapping table that only has the necessary fields. This object
-will be used to attach gene names and functions to the final diff.exp. tables
-```{r}
-genenames.all <- Annotation
-gene.split <- data.frame(do.call('rbind',strsplit(as.character(genenames.all$gene_assignment),"//",fixed=T)))
-probe.gene.map <- data.frame(gene.split[,c(2,3)])
-probe.gene.map$probe <- Annotation[,1]
-probe.gene.map <- probe.gene.map[,c(3,1,2)]
-probe.gene.map$X2 <- gsub("[[:space:]]", "", probe.gene.map$X2)
-colnames(probe.gene.map) <- c("probe","name","description")
-
-head(probe.gene.map)
-```
-
-## generating expression tables for differential abundance tests
+# Generating expression tables for differential abundance tests
 
 This full data table that we just generated is only for record keeping purposes only.  For each of the pairwise tests we will do, we will repeat this except that it will be limited to the samples we are testing with:
 *define the test using the target matrix table (e.g. c vs. t, GF vs GFR)
@@ -137,7 +136,7 @@ Strain <- factor(targets.cGFR.cGF$Strain, levels=c("GF","GFR"))
 Treatment <- factor(targets.cGFR.cGF$Treatment, levels=c("control","drug"))
 ```
 
-###3. define the test as controlling for replicate ("exp") while testing effect of strain
+###3. Define the test as controlling for replicate ("exp") while testing effect of strain
 This is important decision; these chips were ran from different experimental batches,
 thus I have controlled for experiment, essentially running a paired analysis.
 In an earlier iteration, I did not control for experiment and found very few differences due to the 
@@ -162,7 +161,7 @@ summary(results)
 ```
 
 ###5. Generate a table of the differentially expressed genes and attach gene name/function information
-```{r}
+```{r, results="hide"}
 library(data.table)
 library(dplyr)
 diff.cGFR.cGF <- topTable(fit, coef="StrainGFR", n=73)
@@ -171,17 +170,20 @@ colnames(diff.cGFR.cGF)[1] <- "probe"
 diff.cGFR.cGF <- dplyr::left_join(diff.cGFR.cGF,probe.gene.map,by="probe")
 write.table(diff.cGFR.cGF, "diff.cGFR.cGF", quote = F)
 write.table(diff.cGFR.cGF$name, "diff.cGFR.cGF.gene.list", quote = F)
+```
+```{r}
 head(diff.cGFR.cGF)
 ```
 
-This table can be regarded as a final output.  
+This table can be regarded as a final output of the differential expression pipeline.
+
+#TO DO: split this into up and down regulated for analysis purposes
 
 ##6. linking genes to pathways using Reactome.db
 There is an API, a restful API, and some sort of R package "reactome.db" for this. Querying the database directly
-https://reactome.org/PathwayBrowser/#TOOL=AT is simple though. Pasting in the list of genes, we get access to a pathway map
-with a good deal of depth for exploration
+https://reactome.org/PathwayBrowser/#TOOL=AT is simple though. Pasting in the list of genes found in the *.gene.list file that was written, we get access to a pathway map with a good deal of depth for exploration
 
-```{r}
+```{r, echo=F}
 knitr::include_graphics("reactome.cGFR.cGF.png")
 ```
 
