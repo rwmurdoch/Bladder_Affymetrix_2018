@@ -32,16 +32,18 @@ library(hta20transcriptcluster.db)
 Annotation <- read.csv("HTA-2_0.na35.2.hg19.transcript.csv/HTA-2_0.na35.2.hg19.transcript.csv", header=TRUE, skip=19)
 ```
 
-The annotation table is very large and many columns are merged redundant database references (using "//" as separator):
+The annotation table is very large and many columns are merged redundant database references (using "//" as separator).
+However, it is very powerful as it links the probes to a huge number of databases:
 ```{r}
 head(Annotation)
 ```
 
 ## Test matrices
 
-Differential abundance can only be performed on pairs of sample sets.  
+Differential abundance can only be performed on pairs of sample sets.  Each pairwise test has to be configured as a separate file.
+Importing the test matrices:
 
-```{r pressure}
+```{r}
 targets <- read.csv("targets.txt", as.is=T)
 targets.tGF.cGF <- read.csv("targets.GFonly.txt", as.is=T)
 targets.tGFR.cGFR <- read.csv("targets.GFRonly.txt", as.is=T)
@@ -49,4 +51,36 @@ targets.cGFR.cGF <- read.csv("targets.noDrug.Strain.txt", as.is=T)
 targets.tGFR.tGF <- read.csv("targets.drugonly.txt", as.is=T)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+all of the samples and metadata are listed here:
+
+```{r}
+targets
+```
+
+The matrices are set up as such; this matrix is for comparing non-treated and treated samples within in strain GF (control strain)
+
+```{r}
+targets.tGF.cGF
+```
+
+## Reading the .CEL files and normalizing.
+*after being read in, the project is a complex object, not directly viewable.
+*the "exprs" function from the Biobase package pulls out the expression data as a table; at the same time, control 
+  probes are removed.
+*this code chunk also writes the full normalized results as a .tsv file (although there are no stats or comparisons)
+
+```{r}
+dat <- read.celfiles(targets$FileName) #read .CEL files
+project.bgcorrect.norm.avg <- rma(dat, background=TRUE, normalize=TRUE) #normalize
+#this may remove control probes, it should only include probes which actually link to genes
+project.bgcorrect.norm.avg.filt <- exprs(project.bgcorrect.norm.avg)[which(rownames(project.bgcorrect.norm.avg) %in% Annotation[,1]),]
+#this writes the full results as a file
+write.table(project.bgcorrect.norm.avg.filt, "full.expression.results.tsv", sep="\t", row.names = TRUE, quote=FALSE)                                        
+```
+
+## The expression table
+
+After export and filtration, the simplified table looks like:
+```{r}
+head(data.frame(project.bgcorrect.norm.avg.filt))
+```

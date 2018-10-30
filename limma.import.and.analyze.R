@@ -10,7 +10,7 @@
 #biocLite()
 
 
-#install/activate(?) these packages; again, only needed first time or if attempting an upgrade
+#install these packages; again, only needed first time or if attempting an upgrade
 #biocLite("limma")
 #biocLite("statmod")
 #biocLite("affy")
@@ -85,11 +85,6 @@ project.bgcorrect.norm.avg.filt <- exprs(project.bgcorrect.norm.avg)[which(rowna
 #no stat testing has been done yet
 
 write.table(project.bgcorrect.norm.avg.filt, "full.expression.results.tsv", sep="\t", row.names = TRUE, quote=FALSE)
-
-######################################################################################################
-#########################################################
-######################################################################################################
-
 
 
 ######################################################################################################
