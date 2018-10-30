@@ -25,6 +25,7 @@
 #biocLite("affycoretools")
 #biocLite("oligo")
 #biocLite("hta20transcriptcluster.db")
+#biocLite("reactome.db")
 
 ######################################################################################################
 ######################  ONE TIME ACTIONS  ##############################################
@@ -102,10 +103,10 @@ Exp <- factor(targets.cGFR.cGF$Experiment)
 Strain <- factor(targets.cGFR.cGF$Strain, levels=c("GF","GFR"))
 Treatment <- factor(targets.cGFR.cGF$Treatment, levels=c("control","drug"))
 
-#this compares all drug vs no drug samples
+#this compares all drug vs no drug samples,.. check this it is wrong?
 design <- model.matrix(~Exp+Strain)
 
-#I'm just redefining the eset name so taht Ch.17 is easier to copy
+#I'm just redefining the eset name so that Ch.17 is easier to copy
 eset <- project.bgcorrect.norm.avg.filt
 
 fit <- lmFit(eset, design)

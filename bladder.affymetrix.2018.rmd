@@ -84,3 +84,126 @@ After export and filtration, the simplified table looks like:
 ```{r}
 head(data.frame(project.bgcorrect.norm.avg.filt))
 ```
+
+##Mapping probe ID to genes and pathways
+The Annotation table has several columns:
+```{r}
+colnames(Annotation)
+```
+
+Many of these are potentially very useful.  For now, I am useing the gene_assignment column.  This contains many names separated by //.  A single entry can look like this:
+
+```{r}
+Annotation[1,"gene_assignment"]
+```
+
+The second one is a gene name that links well to many databases and the third provides a description. 
+The gene names can be fed into the Reactome online database for pathway mapping.
+We will create a focused mapping table that only has the necessary fields. This object
+will be used to attach gene names and functions to the final diff.exp. tables
+```{r}
+genenames.all <- Annotation
+gene.split <- data.frame(do.call('rbind',strsplit(as.character(genenames.all$gene_assignment),"//",fixed=T)))
+probe.gene.map <- data.frame(gene.split[,c(2,3)])
+probe.gene.map$probe <- Annotation[,1]
+probe.gene.map <- probe.gene.map[,c(3,1,2)]
+probe.gene.map$X2 <- gsub("[[:space:]]", "", probe.gene.map$X2)
+colnames(probe.gene.map) <- c("probe","name","description")
+
+head(probe.gene.map)
+```
+
+## generating expression tables for differential abundance tests
+
+This full data table that we just generated is only for record keeping purposes only.  For each of the pairwise tests we will do, we will repeat this except that it will be limited to the samples we are testing with:
+*define the test using the target matrix table (e.g. c vs. t, GF vs GFR)
+*read in the .CEL files limited to the matrix table (only a subset of .CELs are read in)
+*normalize
+*define your tests and make differential abundance tables
+
+##untreated GF vs untreated GFR
+
+###1. Define the subset of .CEL files, read them in, and normalize them
+```{r}
+dat <- read.celfiles(targets.cGFR.cGF$FileName)
+project.bgcorrect.norm.avg <- rma(dat, background=TRUE, normalize=TRUE)
+project.bgcorrect.norm.avg.filt <- exprs(project.bgcorrect.norm.avg)[which(rownames(project.bgcorrect.norm.avg) %in% Annotation[,1]),]
+```
+
+###2. Load in the metadata
+```{r}
+Exp <- factor(targets.cGFR.cGF$Experiment)
+Strain <- factor(targets.cGFR.cGF$Strain, levels=c("GF","GFR"))
+Treatment <- factor(targets.cGFR.cGF$Treatment, levels=c("control","drug"))
+```
+
+###3. define the test as controlling for replicate ("exp") while testing effect of strain
+This is important decision; these chips were ran from different experimental batches,
+thus I have controlled for experiment, essentially running a paired analysis.
+In an earlier iteration, I did not control for experiment and found very few differences due to the 
+  high variance between experimental replicates
+```{r}
+design <- model.matrix(~Exp+Strain)
+```
+
+###4. Run "fit" algorithms and separate out the significantly different probes
+
+```{r}
+eset <- project.bgcorrect.norm.avg.filt
+fit <- lmFit(eset, design)
+fit <- eBayes(fit, trend=T, robust=T)
+results <- decideTests(fit)
+write.table(summary(results), "controls.summary", quote=F)
+```
+
+####This is a simple summary of the differences, only the far right column
+```{r}
+summary(results)
+```
+
+###5. Generate a table of the differentially expressed genes and attach gene name/function information
+```{r}
+library(data.table)
+library(dplyr)
+diff.cGFR.cGF <- topTable(fit, coef="StrainGFR", n=73)
+setDT(diff.cGFR.cGF, keep.rownames = TRUE)[]
+colnames(diff.cGFR.cGF)[1] <- "probe"
+diff.cGFR.cGF <- dplyr::left_join(diff.cGFR.cGF,probe.gene.map,by="probe")
+write.table(diff.cGFR.cGF, "diff.cGFR.cGF", quote = F)
+write.table(diff.cGFR.cGF$name, "diff.cGFR.cGF.gene.list", quote = F)
+head(diff.cGFR.cGF)
+```
+
+This table can be regarded as a final output.  
+
+##6. linking genes to pathways using Reactome.db
+There is an API, a restful API, and some sort of R package "reactome.db" for this. Querying the database directly
+https://reactome.org/PathwayBrowser/#TOOL=AT is simple though. Pasting in the list of genes, we get access to a pathway map
+with a good deal of depth for exploration
+
+```{r}
+knitr::include_graphics("reactome.cGFR.cGF.png")
+```
+
+This image can be zoomed in on the website for perhaps more information or dramatic focus.
+
+The results can be downloaded and loaded into R:
+
+```{r}
+cGF.cGFR.reactome <- read.csv("reactome.cGFR.cGF.csv", header=T)
+head(cGF.cGFR.reactome)
+```
+
+There is a column that signified which gene names linked to each pathway.
+
+##Reactome also generates a spectacular report .pdf.  Be sure to download it and examine!
+
+#To Do: 
+*before generating dex tables for each of the tests separate the up and down regulated genes before sending to reactome
+
+
+
+
+
+
+close dont delete
