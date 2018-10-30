@@ -20,7 +20,7 @@ The .CEL data is read and analyzed by the "limma" package
 First, the necessary libraries are activated and the annotation table 
 (downloaded from an Affymetrix website) is read in:
 
-```{r, echo=FALSE, results="hide"}
+```{r, echo=FALSE, results="hide", message=FALSE}
 library(limma)
 library(statmod)
 library(affy)
@@ -161,7 +161,7 @@ summary(results)
 ```
 
 ###5. Generate a table of the differentially expressed genes and attach gene name/function information
-```{r, results="hide"}
+```{r, results="hide", message=FALSE}
 library(data.table)
 library(dplyr)
 diff.cGFR.cGF <- topTable(fit, coef="StrainGFR", n=73)
